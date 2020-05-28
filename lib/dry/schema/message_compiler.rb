@@ -216,7 +216,7 @@ module Dry
 
       # @api private
       def message_tokens(args)
-        args.each_with_object({}) do |arg, hash|
+        tokens = args.each_with_object({}) do |arg, hash|
           case arg[1]
           when Array
             hash[arg[0]] = arg[1].join(LIST_SEPARATOR)
@@ -227,6 +227,13 @@ module Dry
             hash[arg[0]] = arg[1]
           end
         end
+        append_mapped_size_tokens(tokens)
+      end
+
+      # @api private
+      def append_mapped_size_tokens(tokens)
+        # this is a temporary fix for the inconsistency in the "size" errors arguments
+        tokens.merge(tokens.transform_keys { |k| k.to_s.gsub("size", "num").to_sym })
       end
     end
   end
