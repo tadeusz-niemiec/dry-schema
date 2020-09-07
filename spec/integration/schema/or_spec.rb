@@ -86,4 +86,87 @@ RSpec.describe Dry::Schema, "OR messages" do
       expect(schema.(foo: {bar: ""}).errors).to eql(foo: {bar: ["must be filled"]})
     end
   end
+
+  context "with two schemas" do
+    name_schema = Dry::Schema.define do
+      required(:name).filled(:str?)
+    end
+
+    first_name_schema = Dry::Schema.define do
+      required(:first_name).filled(:str?)
+    end
+
+    subject(:schema) do
+      Dry::Schema.define do
+        required(:user).schema(name_schema | first_name_schema)
+      end
+    end
+
+    it "returns success for valid input" do
+      expect(schema.(user: { name: "John" })).to be_success
+      expect(schema.(user: { first_name: "John" })).to be_success
+    end
+
+    it "returns OR error message for invalid input" do
+      expect(schema.(user: { last_name: "John" }).errors.to_h).to eq(:user=>{:or=>[{:name=>["is missing"]},
+                                                                                   {:first_name=>["is missing"]}]})
+    end
+
+    context "when one schema contains another nested schema" do
+      scale_options_schema = Dry::Schema.define do
+        required(:value)
+        required(:text).filled(:string)
+      end
+
+      scale_schema = Dry::Schema.define do
+        required(:type).filled(eql?: "scale")
+        required(:id).filled(:string)
+        required(:options)
+            .value(:array, min_size?: 1)
+            .each(:hash, scale_options_schema)
+      end
+
+      questions_schema = Dry::Schema.define do
+        required(:type).filled(eql?: "question")
+        required(:id).filled(:string)
+        required(:text).filled(:string)
+      end
+
+      subject(:schema) do
+        Dry::Schema.define do
+          required(:definitions)
+              .value(:array, min_size?: 1)
+              .each(:hash, questions_schema | scale_schema)
+        end
+      end
+
+      it "returns success for valid input" do
+        valid_hash = {
+            definitions: [
+                {
+                    type: "scale",
+                    id: "1",
+                    options: [
+                        {
+                            text: "No",
+                            value: 1,
+                        },
+                        {
+                            text: "Yes",
+                            value: 2,
+                        },
+                    ],
+                },
+                {
+                    id: "2",
+                    type: "question",
+                    text: "hello",
+                },
+            ],
+        }
+
+        expect(schema.(valid_hash)).to be_success
+      end
+    end
+  end
 end
